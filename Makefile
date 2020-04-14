@@ -1,4 +1,4 @@
 all: main
 
 main:
-	gcc -std=c11 -Wall  -o run main.c
+	gcc -std=c11 -Wall -lm -o run main.c

@@ -4,6 +4,7 @@
 #include <inttypes.h>
 #include <unistd.h>
 #include <time.h>
+#include <math.h>
 #include <argp.h>
 
 const char *argp_program_version =
@@ -77,6 +78,21 @@ static struct argp argp = { options, parse_opt, 0 , doc };
 
 clock_t ticks, new_ticks;
 struct timespec t1, t2;
+
+void timespec_diff(struct timespec *start, struct timespec *stop,
+                   struct timespec *result)
+{
+    if ((stop->tv_nsec - start->tv_nsec) < 0) {
+        result->tv_sec = stop->tv_sec - start->tv_sec - 1;
+        result->tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
+    } else {
+        result->tv_sec = stop->tv_sec - start->tv_sec;
+        result->tv_nsec = stop->tv_nsec - start->tv_nsec;
+    }
+    return;
+}
+
+
 int main(int argc, char **argv) {
     //parsing args----------------------------------------------------------------
     struct arguments arguments;
@@ -92,30 +108,51 @@ int main(int argc, char **argv) {
 
     argp_parse (&argp, argc, argv, 0, 0, &arguments);
     //parsing args end---------------------------------------------------------------
-    long * n_times = malloc(arguments.iterations  * sizeof(long));
-
+    struct timespec * t_times = malloc(arguments.iterations  * sizeof(struct timespec));
+    uint64_t * nanos = malloc(arguments.iterations * sizeof(uint64_t));
     float f2 = (float) arguments.iterations + 1.1; //avoid compiler optimization, because iterations is unknown for compiler
     float f1 = 1.1f;
     //iterate
     for (size_t j = 0; j < arguments.iterations ; j++){
         f2 = (float) arguments.iterations + 0.1 + j;
         clock_gettime(CLOCK_MONOTONIC, &t1);
-        printf("time: %i\t", t1.tv_nsec);
+        //printf("time: %i\t", t1.tv_nsec);
         for (size_t i = 0 ; i < arguments.reps_per_iteration; i++){
             f1 = f2 * 1.1f;
         }
         clock_gettime(CLOCK_MONOTONIC, &t2);
-        n_times[j] = t2.tv_nsec - t1.tv_nsec;
-
-
+        struct timespec c;
+        timespec_diff(&t1,&t2,&c);
+        t_times[j] = c;
+        nanos[j] = c.tv_sec * 1000000000 + c.tv_nsec;
     }
-    //printf("Number = %f\n", f1);
 
+    //calculate mean and variance
+    uint64_t mean = 0;
     for ( size_t i = 0 ; i < arguments.iterations; i++){
-        printf("%d\t", n_times[i]);
-    }
-    printf("\n");
+        mean += nanos[i];
+        printf("dif=%ld sec %ld nsec \t nanos= %ld\n", t_times[i].tv_sec , t_times[i].tv_nsec, nanos[i]);
 
+    }
+    mean = mean / arguments.iterations;
+
+    //variance
+    uint64_t variance = 0;
+    for ( size_t i = 0 ; i < arguments.iterations; i++){
+        variance += (mean - nanos[i]) * (mean - nanos[i]);
+        //printf("%ld ** 2 = %ld\t",(mean - nanos[i]),(mean - nanos[i]) * (mean - nanos[i]));
+    }
+    variance = variance / arguments.iterations;
+    double std_derivation = sqrt(variance);
+    double relvar = (double) variance / (double) mean ;
+    double gflop =( double ) arguments.reps_per_iteration / (double) mean  ; // flops per nanosecond = Gflops
+    double vgfkop = (double) relvar * gflop;
+    double std_variation_gflop = sqrt(vgfkop);
+    printf("-----------------------------\n");
+    printf("raw:\n");
+    printf("mean: %ld\tstd_variation: %f\tvar: %ld\trel var: %f\n", mean,std_derivation, variance, relvar);
+    printf("\ngflops:\n");
+    printf("mean: %f\tstd_variation: %f\tvar: %f\trel var: %f\n", gflop,std_variation_gflop, vgfkop, relvar);
 
 
 }
