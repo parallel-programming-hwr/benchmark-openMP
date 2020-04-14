@@ -131,8 +131,12 @@ int main(int argc, char **argv) {
     uint64_t mean = 0;
     for ( size_t i = 0 ; i < arguments.iterations; i++){
         mean += nanos[i];
-        printf("dif=%ld sec %ld nsec \t nanos= %ld\n", t_times[i].tv_sec , t_times[i].tv_nsec, nanos[i]);
-
+        if (arguments.verbose && !arguments.silent){
+            printf("dif=%ld sec %ld nsec \t nanos= %ld\n", t_times[i].tv_sec , t_times[i].tv_nsec, nanos[i]);
+        }
+    }
+    if (arguments.verbose){
+        printf("--------------------------------------------\n");
     }
     mean = mean / arguments.iterations;
 
@@ -140,20 +144,23 @@ int main(int argc, char **argv) {
     uint64_t variance = 0;
     for ( size_t i = 0 ; i < arguments.iterations; i++){
         variance += (mean - nanos[i]) * (mean - nanos[i]);
-        //printf("%ld ** 2 = %ld\t",(mean - nanos[i]),(mean - nanos[i]) * (mean - nanos[i]));
     }
     variance = variance / arguments.iterations;
-    double std_derivation = sqrt(variance);
-    double relvar = (double) variance / (double) mean ;
+    double std_deviation = sqrt(variance);
+    double rel_deviation = (double) std_deviation / (double) mean ;
     double gflop =( double ) arguments.reps_per_iteration / (double) mean  ; // flops per nanosecond = Gflops
-    double vgfkop = (double) relvar * gflop;
-    double std_variation_gflop = sqrt(vgfkop);
-    printf("-----------------------------\n");
+    double std_deviation_gflop = rel_deviation * gflop;
+    double vgfkop = std_deviation_gflop * std_deviation_gflop;
+
+    if(arguments.silent){
+        return 0;
+    }
     printf("raw:\n");
-    printf("mean: %ld\tstd_variation: %f\tvar: %ld\trel var: %f\n", mean,std_derivation, variance, relvar);
+    printf("mean: %ld\tstd_variation: %f\tvar: %ld\trel deviation: %f\n", mean,std_deviation, variance, rel_deviation);
     printf("\ngflops:\n");
-    printf("mean: %f\tstd_variation: %f\tvar: %f\trel var: %f\n", gflop,std_variation_gflop, vgfkop, relvar);
+    printf("mean: %f\tstd_variation: %f\tvar: %f\trel deviation: %f\n", gflop,std_deviation_gflop, vgfkop, rel_deviation);
 
 
+    return 0;
 }
 
