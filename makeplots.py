@@ -15,5 +15,5 @@ with open('data.txt') as FILE:
         y_values.append(float(row[0]))
         y_err.append(float(row[1]))
     print(x_values)
-    plt.errorbar(x_values,y_values,yerr=y_err)
+    plt.errorbar(x_values,y_values,yerr=y_err, fmt='.')
     plt.savefig('plot.png')

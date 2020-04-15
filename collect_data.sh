@@ -22,7 +22,7 @@ rm $FILENAME 2> /dev/null
 
 for i in $(eval echo  {1..$THREADS}) 
 do
-	./run -r 100000000 -i 5 -n $i | tee -a  $FILENAME
+	./run -r 10000000 -i 5 -n $i | tee -a  $FILENAME
 done
 
 	
