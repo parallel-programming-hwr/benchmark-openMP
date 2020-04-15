@@ -120,15 +120,16 @@ int main(int argc, char **argv) {
     float f1 = 1.1f;
 
     //manage threads
-    printf("threads: %d\n", omp_get_max_threads());
     if(arguments.numThreads == 0 ){
         //setting thread number automatic
     }
     else{
         omp_set_num_threads(arguments.numThreads);
     }
-    printf("threads: %d\n", omp_get_max_threads());
+
+
     if(arguments.verbose && !arguments.silent){
+        printf("using threads: %d\n", omp_get_max_threads());
         //printf("using %d threads\n", OMP_NUM_THREADS);
     }
     //iterate
@@ -196,19 +197,27 @@ int main(int argc, char **argv) {
     if(arguments.silent){
         return 0;
     }
-    if (arguments.verbose){
+    if (arguments.verbose) {
         printf("All values displayed in nanosecond and relative deviations in %%\n");
+
+        printf("real time from clock_gettime for one iteration (%ld operations):\n", arguments.reps_per_iteration);
+        printf("mean: %ld\tdeviation: %f\tvariance: %ld\trel deviation: %f\n", mean, std_deviation, variance, rel_deviation);
+        printf("\ngflops (1000000000 operations per second):\n");
+        printf("mean: %f\tdeviation: %f\tvariance: %f\trel deviation: %f\n", gflop, gflop_deviation, vgfkop,
+               rel_deviation);
+        printf("\ntime calculated from cpu ticks per iteration (%ld operations)(does not make sense for more then 1 thread):\n",
+               arguments.reps_per_iteration);
+        printf("mean: %f\tdeviation: %f\tvariance: %f\trel deviation: %f\n", cpu_time_mean, cpu_time_deviation,
+               cpu_time_variance, cpu_time_rel_deviation);
+        printf("\ngflops (1000000000 operations per second):\n");
+        printf("mean: %1f\tdeviation: %f\tvariance: %f\trel deviation: %f\n", cpu_ticks_gflop,
+               cpu_ticks_gflop_deviation, cpu_ticks_vgfkop, cpu_time_rel_deviation);
+
     }
-    printf("real time from clock_gettime for one iteration (%ld operations):\n", arguments.reps_per_iteration);
-    printf("mean: %ld\tdeviation: %f\tvariance: %ld\trel deviation: %f\n", mean,std_deviation, variance, rel_deviation);
-    printf("\ngflops (1000000000 operations per second):\n");
-    printf("mean: %f\tdeviation: %f\tvariance: %f\trel deviation: %f\n", gflop,gflop_deviation, vgfkop, rel_deviation);
-    printf("\ntime calculated from cpu ticks per iteration (%ld operations)(does not make sense for more then 1 thread):\n", arguments.reps_per_iteration);
-    printf("mean: %f\tdeviation: %f\tvariance: %f\trel deviation: %f\n", cpu_time_mean,cpu_time_deviation, cpu_time_variance, cpu_time_rel_deviation);
-    printf("\ngflops (1000000000 operations per second):\n");
-    printf("mean: %1f\tdeviation: %f\tvariance: %f\trel deviation: %f\n", cpu_ticks_gflop,cpu_ticks_gflop_deviation, cpu_ticks_vgfkop, cpu_time_rel_deviation);
-
-
+    else {
+        printf("%f\t%f\t%f\t%f\t%i\n", gflop, gflop_deviation, vgfkop,
+               rel_deviation, omp_get_max_threads());
+    }
     return 0;
 }
 
