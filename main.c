@@ -108,57 +108,88 @@ int main(int argc, char **argv) {
 
     argp_parse (&argp, argc, argv, 0, 0, &arguments);
     //parsing args end---------------------------------------------------------------
+
+    //allocate mem for measured times
     struct timespec * t_times = malloc(arguments.iterations  * sizeof(struct timespec));
     uint64_t * nanos = malloc(arguments.iterations * sizeof(uint64_t));
+    double * cpu_clocks = malloc(arguments.iterations * sizeof(double));
+
     float f2 = (float) arguments.iterations + 1.1; //avoid compiler optimization, because iterations is unknown for compiler
     float f1 = 1.1f;
     //iterate
     for (size_t j = 0; j < arguments.iterations ; j++){
         f2 = (float) arguments.iterations + 0.1 + j;
         clock_gettime(CLOCK_MONOTONIC, &t1);
+        ticks = clock();
         //printf("time: %i\t", t1.tv_nsec);
         for (size_t i = 0 ; i < arguments.reps_per_iteration; i++){
             f1 = f2 * 1.1f;
         }
         clock_gettime(CLOCK_MONOTONIC, &t2);
+        new_ticks = clock();
+
         struct timespec c;
         timespec_diff(&t1,&t2,&c);
         t_times[j] = c;
         nanos[j] = c.tv_sec * 1000000000 + c.tv_nsec;
+
+        cpu_clocks[j] = (double )(new_ticks - ticks) * 1000000000 / (double) CLOCKS_PER_SEC;
     }
 
     //calculate mean and variance
     uint64_t mean = 0;
+    double cpu_time_mean = 0.0f;
     for ( size_t i = 0 ; i < arguments.iterations; i++){
         mean += nanos[i];
+        cpu_time_mean += cpu_clocks[i];
         if (arguments.verbose && !arguments.silent){
-            printf("dif=%ld sec %ld nsec \t nanos= %ld\n", t_times[i].tv_sec , t_times[i].tv_nsec, nanos[i]);
+            printf("real time per iteration = %ld sec %ld nsec \t cpu_time = %lf\n", t_times[i].tv_sec , t_times[i].tv_nsec, cpu_clocks[i]);
         }
     }
     if (arguments.verbose){
         printf("--------------------------------------------\n");
     }
-    mean = mean / arguments.iterations;
-
-    //variance
+    mean /= arguments.iterations;
+    cpu_time_mean /= arguments.iterations;
+    //variance of real time adn cpu time
     uint64_t variance = 0;
+    double cpu_time_variance = 0;
     for ( size_t i = 0 ; i < arguments.iterations; i++){
         variance += (mean - nanos[i]) * (mean - nanos[i]);
+        cpu_time_variance += (cpu_time_mean - cpu_clocks[i]) * (cpu_time_mean - cpu_clocks[i]);
     }
-    variance = variance / arguments.iterations;
+    variance /= arguments.iterations;
+    cpu_time_variance /= arguments.iterations;
     double std_deviation = sqrt(variance);
     double rel_deviation = (double) std_deviation / (double) mean ;
+
+    //gflops
     double gflop =( double ) arguments.reps_per_iteration / (double) mean  ; // flops per nanosecond = Gflops
-    double std_deviation_gflop = rel_deviation * gflop;
-    double vgfkop = std_deviation_gflop * std_deviation_gflop;
+    double gflop_deviation = rel_deviation * gflop;
+    double vgfkop = gflop_deviation * gflop_deviation;
+
+    //time calculated from  cpu ticks
+    double cpu_time_deviation = sqrt(cpu_time_variance);
+    double cpu_time_rel_deviation = cpu_time_deviation / cpu_time_mean;
+    //gflops
+    double cpu_ticks_gflop =( double ) arguments.reps_per_iteration / (double) mean  ; // flops per nanosecond = Gflops
+    double cpu_ticks_gflop_deviation = cpu_time_rel_deviation * cpu_ticks_gflop;
+    double cpu_ticks_vgfkop = cpu_ticks_gflop_deviation * cpu_ticks_gflop_deviation;
 
     if(arguments.silent){
         return 0;
     }
-    printf("raw:\n");
-    printf("mean: %ld\tstd_variation: %f\tvar: %ld\trel deviation: %f\n", mean,std_deviation, variance, rel_deviation);
-    printf("\ngflops:\n");
-    printf("mean: %f\tstd_variation: %f\tvar: %f\trel deviation: %f\n", gflop,std_deviation_gflop, vgfkop, rel_deviation);
+    if (arguments.verbose){
+        printf("All values displayed in nanosecond and relative deviations in %%\n");
+    }
+    printf("real time from clock_gettime for one iteration (%ld operations):\n", arguments.reps_per_iteration);
+    printf("mean: %ld\tdeviation: %f\tvariance: %ld\trel deviation: %f\n", mean,std_deviation, variance, rel_deviation);
+    printf("\ngflops (1000000000 operations per second):\n");
+    printf("mean: %f\tdeviation: %f\tvariance: %f\trel deviation: %f\n", gflop,gflop_deviation, vgfkop, rel_deviation);
+    printf("\ntime calculated from cpu ticks per iteration (%ld operations):\n", arguments.reps_per_iteration);
+    printf("mean: %f\tdeviation: %f\tvariance: %f\trel deviation: %f\n", cpu_time_mean,cpu_time_deviation, cpu_time_variance, cpu_time_rel_deviation);
+    printf("\ngflops (1000000000 operations per second):\n");
+    printf("mean: %f\tdeviation: %f\tvariance: %f\trel deviation: %f\n", cpu_ticks_gflop,cpu_ticks_gflop_deviation, cpu_ticks_vgfkop, cpu_time_rel_deviation);
 
 
     return 0;
