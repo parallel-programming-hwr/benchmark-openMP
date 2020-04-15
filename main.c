@@ -5,13 +5,15 @@
 #include <unistd.h>
 #include <time.h>
 #include <math.h>
+#include <omp.h>
+
 #include <argp.h>
 
 const char *argp_program_version =
         "benchmark  0.1";
 /* Program documentation. */
 static char doc[] =
-        "I wonder for what this is";
+        "Do some benchmark with openMP";
 
 static struct argp_option options[] = {
         {"verbose",  'v', 0,      0,  "Produce verbose output" },
@@ -104,7 +106,7 @@ int main(int argc, char **argv) {
     arguments.iterations = 100;
     arguments.output_file = "-";
     arguments.operation = "mul";
-    arguments.numThreads = 1;
+    arguments.numThreads = 0;
 
     argp_parse (&argp, argc, argv, 0, 0, &arguments);
     //parsing args end---------------------------------------------------------------
@@ -114,16 +116,31 @@ int main(int argc, char **argv) {
     uint64_t * nanos = malloc(arguments.iterations * sizeof(uint64_t));
     double * cpu_clocks = malloc(arguments.iterations * sizeof(double));
 
-    float f2 = (float) arguments.iterations + 1.1; //avoid compiler optimization, because iterations is unknown for compiler
+    float f2 = (float) arguments.iterations + 1.1f; //avoid compiler optimization, because iterations is unknown for compiler
     float f1 = 1.1f;
+
+    //manage threads
+    printf("threads: %d\n", omp_get_max_threads());
+    if(arguments.numThreads == 0 ){
+        //setting thread number automatic
+    }
+    else{
+        omp_set_num_threads(arguments.numThreads);
+    }
+    printf("threads: %d\n", omp_get_max_threads());
+    if(arguments.verbose && !arguments.silent){
+        //printf("using %d threads\n", OMP_NUM_THREADS);
+    }
     //iterate
     for (size_t j = 0; j < arguments.iterations ; j++){
         f2 = (float) arguments.iterations + 0.1 + j;
         clock_gettime(CLOCK_MONOTONIC, &t1);
         ticks = clock();
         //printf("time: %i\t", t1.tv_nsec);
+        #pragma omp parallel for private(f1,f2)
         for (size_t i = 0 ; i < arguments.reps_per_iteration; i++){
             f1 = f2 * 1.1f;
+            //printf("thread: %i of %i\n", omp_get_thread_num() ,omp_get_num_threads()); for debugging
         }
         clock_gettime(CLOCK_MONOTONIC, &t2);
         new_ticks = clock();
@@ -172,7 +189,7 @@ int main(int argc, char **argv) {
     double cpu_time_deviation = sqrt(cpu_time_variance);
     double cpu_time_rel_deviation = cpu_time_deviation / cpu_time_mean;
     //gflops
-    double cpu_ticks_gflop =( double ) arguments.reps_per_iteration / (double) mean  ; // flops per nanosecond = Gflops
+    double cpu_ticks_gflop =( double ) arguments.reps_per_iteration / (double) cpu_time_mean  ; // flops per nanosecond = Gflops
     double cpu_ticks_gflop_deviation = cpu_time_rel_deviation * cpu_ticks_gflop;
     double cpu_ticks_vgfkop = cpu_ticks_gflop_deviation * cpu_ticks_gflop_deviation;
 
@@ -186,10 +203,10 @@ int main(int argc, char **argv) {
     printf("mean: %ld\tdeviation: %f\tvariance: %ld\trel deviation: %f\n", mean,std_deviation, variance, rel_deviation);
     printf("\ngflops (1000000000 operations per second):\n");
     printf("mean: %f\tdeviation: %f\tvariance: %f\trel deviation: %f\n", gflop,gflop_deviation, vgfkop, rel_deviation);
-    printf("\ntime calculated from cpu ticks per iteration (%ld operations):\n", arguments.reps_per_iteration);
+    printf("\ntime calculated from cpu ticks per iteration (%ld operations)(does not make sense for more then 1 thread):\n", arguments.reps_per_iteration);
     printf("mean: %f\tdeviation: %f\tvariance: %f\trel deviation: %f\n", cpu_time_mean,cpu_time_deviation, cpu_time_variance, cpu_time_rel_deviation);
     printf("\ngflops (1000000000 operations per second):\n");
-    printf("mean: %f\tdeviation: %f\tvariance: %f\trel deviation: %f\n", cpu_ticks_gflop,cpu_ticks_gflop_deviation, cpu_ticks_vgfkop, cpu_time_rel_deviation);
+    printf("mean: %1f\tdeviation: %f\tvariance: %f\trel deviation: %f\n", cpu_ticks_gflop,cpu_ticks_gflop_deviation, cpu_ticks_vgfkop, cpu_time_rel_deviation);
 
 
     return 0;

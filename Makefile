@@ -1,4 +1,4 @@
 all: main
 
 main:
-	gcc -std=c11 -Wextra -pedantic -Wall -lm -o run main.c
+	gcc -fopenmp -std=c11 -pedantic -Wall -lm -o run main.c
