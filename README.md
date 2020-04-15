@@ -4,7 +4,7 @@ some benchamarks with openMP in C
 ## compile
 make to compile
 
-##usage 
+## usage 
 then 
 ```bash
 ./collect_data.sh <num> <outdata.txt> 
