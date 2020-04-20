@@ -9,11 +9,12 @@ then
 ```bash
 ./collect_data.sh <num> <outdata.txt> 
 ```
-to run program with 1 to num threads
-you can specify reps per iteration and iterations in collect\_data.sh
+to run program with 1 to num threads.
 
-run 
+You can specify reps per iteration and iterations in collect\_data.sh.
+
+Run 
 ```bash
 ./make_plots.py <indata.txt> <outplot.png>
 ```
-to make plot
+to make plot.

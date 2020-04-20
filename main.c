@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <math.h>
+#include <string.h>
 #include <omp.h>
 
 #include <argp.h>
@@ -21,13 +22,14 @@ static struct argp_option options[] = {
         {"iterations",   'i', "NUMBER", 0, "Number of iterations" },
         {"output",   'o', "file", 0, "output to file instead of stdout" },
         {"reps",   'r', "NUMBER", 0, "number of repetions in each iteration" },
+        {"data",   'b', "NUMBER", 0, "number of kB to iterate over (if size extends LVL1 cache, speed up can be faster then according to Amdahl's law)" },
         {"operation",   'O', "name", 0, "operation e.g. mul, add. ..." },
         {"numThreads",   'n', "NUMBER", 0, "specifies number of threads to be used. Default is num of logical cpus" },
         { 0 }
 };
 struct arguments
 {
-    int silent, verbose, numThreads;
+    int silent, verbose, numThreads , buffer_size_kb , use_reps_iteration;
     int use_output_file;
     char *output_file;
     char *operation;
@@ -53,17 +55,21 @@ parse_opt (int key, char *arg, struct argp_state *state)
             arguments->output_file = arg;
             arguments->use_output_file = 1;
             break;
+        case 'b':
+            arguments->buffer_size_kb = strtol(arg,NULL,10);//TODO error handling
+            break;
         case 'O':
             arguments->operation = arg;
             break;
         case 'n':
-            arguments->numThreads = strtol(arg,NULL,10);
+            arguments->numThreads = strtol(arg,NULL,10);//TODO error handling
             break;
 	case 'i':
-	    arguments->iterations = strtol(arg,NULL,10);//todo error handling
+	    arguments->iterations = strtol(arg,NULL,10);//TODO error handling
 	    break;
-	case 'r': 
-	    arguments->reps_per_iteration = strtol(arg,NULL,10);//todo error handling
+	case 'r':
+	    arguments->use_reps_iteration = 1;
+	    arguments->reps_per_iteration = strtol(arg,NULL,10);//TODO error handling
 	    break;
         case ARGP_KEY_ARG:
             argp_usage (state);
@@ -107,6 +113,8 @@ int main(int argc, char **argv) {
     arguments.output_file = "-";
     arguments.operation = "mul";
     arguments.numThreads = 0;
+    arguments.buffer_size_kb = 0;
+    arguments.use_reps_iteration = 0;
 
     argp_parse (&argp, argc, argv, 0, 0, &arguments);
     //parsing args end---------------------------------------------------------------
@@ -115,7 +123,29 @@ int main(int argc, char **argv) {
     struct timespec * t_times = malloc(arguments.iterations  * sizeof(struct timespec));
     uint64_t * nanos = malloc(arguments.iterations * sizeof(uint64_t));
     double * cpu_clocks = malloc(arguments.iterations * sizeof(double));
+    double * float_buffer = NULL;
+    //allocate mem for buffer
+    if (arguments.buffer_size_kb){
+        if (arguments.verbose)
+            printf("allcating %li bytes of memory\n", sizeof(double)*128*arguments.buffer_size_kb);
+        float_buffer = malloc(sizeof(double) * 128 * arguments.buffer_size_kb) ; //128 * 8byte(sizeof(double)) = 1kbyte
+        if (float_buffer == NULL)
+            perror("malloc\n");
+        memset(float_buffer,0, 128*sizeof(double));
+        for (size_t i = 0 ; i < arguments.buffer_size_kb * 128 ; i++){
+            float_buffer[i] = 1.1f;
+        }
+        if (arguments.verbose) {
+            if (arguments.use_reps_iteration) {
+                printf("warn: ignoring reps per iteration and set it to 128 * buffer_size\n");
+            }
+            else {
+                printf("setting reps per iteration to 128 * buffer_size\n");
+            }
+        }
 
+        arguments.reps_per_iteration = arguments.buffer_size_kb * 128;
+    }
     float f2 = (float) arguments.iterations + 1.1f; //avoid compiler optimization, because iterations is unknown for compiler
     float f1 = 1.1f;
 
@@ -138,10 +168,19 @@ int main(int argc, char **argv) {
         clock_gettime(CLOCK_MONOTONIC, &t1);
         ticks = clock();
         //printf("time: %i\t", t1.tv_nsec);
-        #pragma omp parallel for private(f1,f2)
-        for (size_t i = 0 ; i < arguments.reps_per_iteration; i++){
-            f1 = f2 * 1.1f;
-            //printf("thread: %i of %i\n", omp_get_thread_num() ,omp_get_num_threads()); for debugging
+
+        if (arguments.buffer_size_kb == 0) {
+            #pragma omp parallel for private(f1,f2)
+            for (size_t i = 0; i < arguments.reps_per_iteration; i++) {
+                f1 = f2 * 1.1f;
+                //printf("thread: %i of %i\n", omp_get_thread_num() ,omp_get_num_threads()); for debugging
+            }
+        }
+        else {
+            #pragma omp parraled for
+            for (size_t i = 0 ; i < arguments.buffer_size_kb * 128 ; i++ ){
+                float_buffer[i] = float_buffer[i] * float_buffer[i];
+            }
         }
         clock_gettime(CLOCK_MONOTONIC, &t2);
         new_ticks = clock();
@@ -199,7 +238,8 @@ int main(int argc, char **argv) {
     }
     if (arguments.verbose) {
         printf("All values displayed in nanosecond and relative deviations in %%\n");
-
+        if(arguments.buffer_size_kb)
+            printf("Using buffer with %ikBytes", arguments.buffer_size_kb);
         printf("real time from clock_gettime for one iteration (%ld operations):\n", arguments.reps_per_iteration);
         printf("mean: %ld\tdeviation: %f\tvariance: %ld\trel deviation: %f\n", mean, std_deviation, variance, rel_deviation);
         printf("\ngflops (1000000000 operations per second):\n");
