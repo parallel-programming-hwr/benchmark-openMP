@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
     //allocate mem for buffer
     if (arguments.buffer_size_kb){
         if (arguments.verbose)
-            printf("allcating %li bytes of memory\n", sizeof(double)*128*arguments.buffer_size_kb);
+            printf("allocating %li bytes of memory\n", sizeof(double)*128*arguments.buffer_size_kb);
         float_buffer = malloc(sizeof(double) * 128 * arguments.buffer_size_kb) ; //128 * 8byte(sizeof(double)) = 1kbyte
         if (float_buffer == NULL)
             perror("malloc\n");
@@ -177,7 +177,7 @@ int main(int argc, char **argv) {
             }
         }
         else {
-            #pragma omp parraled for
+            #pragma omp parraled for private(float_buffer)
             for (size_t i = 0 ; i < arguments.buffer_size_kb * 128 ; i++ ){
                 float_buffer[i] = float_buffer[i] * float_buffer[i];
             }
