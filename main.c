@@ -160,7 +160,6 @@ int main(int argc, char **argv) {
 
     if(arguments.verbose && !arguments.silent){
         printf("using threads: %d\n", omp_get_max_threads());
-        //printf("using %d threads\n", OMP_NUM_THREADS);
     }
     //iterate
     for (size_t j = 0; j < arguments.iterations ; j++){
@@ -177,9 +176,11 @@ int main(int argc, char **argv) {
             }
         }
         else {
-            #pragma omp parraled for private(float_buffer)
+            #pragma omp parallel for
             for (size_t i = 0 ; i < arguments.buffer_size_kb * 128 ; i++ ){
                 float_buffer[i] = float_buffer[i] * float_buffer[i];
+                //printf("thread: %i of %i\n", omp_get_thread_num() ,omp_get_num_threads()); //for debugging
+
             }
         }
         clock_gettime(CLOCK_MONOTONIC, &t2);
