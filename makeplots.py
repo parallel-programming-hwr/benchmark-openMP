@@ -3,7 +3,8 @@
 import matplotlib.pylab as plt
 import csv
 import sys
-if len(sys.argv) == 2:
+
+if len(sys.argv) >= 2:
     infile = sys.argv[1]
 else:
     infile = 'data.txt'
@@ -23,6 +24,7 @@ with open(infile) as FILE:
         x_values.append(float(row[4]))
         y_values.append(float(row[0]))
         y_err.append(float(row[1]))
-    print(x_values)
+    plt.xlabel("Kerne")
+    plt.ylabel("Rechenleistung in GFlops")
     plt.errorbar(x_values,y_values,yerr=y_err, fmt='.')
     plt.savefig(outfile)
